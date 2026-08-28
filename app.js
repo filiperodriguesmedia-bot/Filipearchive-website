@@ -399,33 +399,87 @@
 
   
   // ---------------------------------------------------------------------
-  // Keep autoplay background videos alive on Safari/mobile.
+  // Resilient ambient-video autoplay.
+  // Safari can restore a page with a muted autoplay video in a paused state,
+  // especially after refresh, back/forward cache, tab switching or a slow
+  // media response. Reassert the autoplay contract whenever the video/page
+  // becomes usable, and keep a very light watchdog as a final safeguard.
   // ---------------------------------------------------------------------
   const ambientVideos = [...document.querySelectorAll('video[autoplay][muted]')];
   if (ambientVideos.length) {
     const attemptPlay = (video) => {
+      if (!video || document.hidden) return;
       video.muted = true;
       video.defaultMuted = true;
+      video.autoplay = true;
+      video.loop = true;
       video.playsInline = true;
+      video.setAttribute('muted', '');
+      video.setAttribute('autoplay', '');
+      video.setAttribute('loop', '');
       video.setAttribute('playsinline', '');
       video.setAttribute('webkit-playsinline', '');
+
+      // If Safari has not attached the media resource after a refresh, force
+      // one load cycle. Do not reload videos that already have buffered data.
+      if (video.readyState === HTMLMediaElement.HAVE_NOTHING && video.networkState !== HTMLMediaElement.NETWORK_LOADING) {
+        try { video.load(); } catch (_) {}
+      }
+
       const promise = video.play();
       if (promise && typeof promise.catch === 'function') promise.catch(() => {});
     };
+
+    const restartAll = () => ambientVideos.forEach(attemptPlay);
+
     ambientVideos.forEach((video) => {
-      ['loadedmetadata', 'canplay', 'suspend', 'stalled'].forEach(evt => {
-        video.addEventListener(evt, () => attemptPlay(video));
+      ['loadedmetadata', 'loadeddata', 'canplay', 'canplaythrough', 'waiting', 'stalled', 'ended'].forEach(evt => {
+        video.addEventListener(evt, () => attemptPlay(video), { passive: true });
       });
       video.addEventListener('pause', () => {
-        if (!document.hidden) attemptPlay(video);
+        if (!document.hidden) requestAnimationFrame(() => attemptPlay(video));
+      });
+      video.addEventListener('error', () => {
+        window.setTimeout(() => {
+          try { video.load(); } catch (_) {}
+          attemptPlay(video);
+        }, 350);
       });
       attemptPlay(video);
     });
+
+    // Restart when a section containing an ambient video approaches view.
+    if ('IntersectionObserver' in window) {
+      const videoObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) attemptPlay(entry.target);
+        });
+      }, { rootMargin: '30% 0px 30% 0px', threshold: 0 });
+      ambientVideos.forEach(video => videoObserver.observe(video));
+    }
+
     document.addEventListener('visibilitychange', () => {
-      if (!document.hidden) ambientVideos.forEach(attemptPlay);
+      if (!document.hidden) restartAll();
     });
-    window.addEventListener('focus', () => ambientVideos.forEach(attemptPlay));
-    window.addEventListener('pageshow', () => ambientVideos.forEach(attemptPlay));
+    window.addEventListener('focus', restartAll);
+    window.addEventListener('pageshow', restartAll);
+    window.addEventListener('load', restartAll, { once: true });
+
+    // If browser policy delayed autoplay, the first genuine interaction gets
+    // another chance without changing the user's scroll or playback controls.
+    ['pointerdown', 'touchstart', 'keydown'].forEach(evt => {
+      window.addEventListener(evt, restartAll, { once: true, passive: evt !== 'keydown' });
+    });
+
+    // Very light safety check for the intermittent Safari refresh case.
+    window.setInterval(() => {
+      if (document.hidden) return;
+      ambientVideos.forEach(video => {
+        const rect = video.getBoundingClientRect();
+        const nearViewport = rect.bottom > -window.innerHeight * .25 && rect.top < window.innerHeight * 1.25;
+        if (nearViewport && (video.paused || video.ended)) attemptPlay(video);
+      });
+    }, 1800);
   }
 
 // ---------------------------------------------------------------------
