@@ -1192,7 +1192,7 @@ body.lightbox-open { overflow: hidden; }
   *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
   .text-reveal { visibility: visible; }
   .reveal-line > span { transform: none; filter: none; opacity: 1; }
-  .index-card { opacity: 1; transform: none; }
+  .index-card { opacity: 1; transform: translateX(var(--stack-offset)) translateY(0) scale(1); }
   .collection-card { opacity: 1; filter: none; transform: rotate(var(--r)) scale(1); animation: none !important; translate: 0 0 !important; }
   .qr-frame { opacity: 1; filter: none; transform: none; }
   .screen-edge-blur { backdrop-filter: none; -webkit-backdrop-filter: none; }
