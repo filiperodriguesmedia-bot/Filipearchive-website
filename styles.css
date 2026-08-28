@@ -332,6 +332,7 @@ figure, p, h1, h2, h3 { margin: 0; }
   perspective: 1200px;
 }
 .index-card {
+  --stack-offset: 0px;
   position: relative;
   isolation: isolate;
   display: grid;
@@ -346,7 +347,7 @@ figure, p, h1, h2, h3 { margin: 0; }
   color: var(--brown);
   text-decoration: none;
   opacity: 0;
-  transform: translateY(18px) scale(.994);
+  transform: translateX(var(--stack-offset)) translateY(18px) scale(.994);
   transform-origin: 50% 50%;
   transition:
     opacity .72s var(--ease),
@@ -356,14 +357,14 @@ figure, p, h1, h2, h3 { margin: 0; }
   box-shadow: none !important;
 }
 .index-card + .index-card { margin-top: -7px; }
-.index-card:nth-child(1) { z-index: 4; }
-.index-card:nth-child(2) { z-index: 3; }
-.index-card:nth-child(3) { z-index: 2; }
-.index-card:nth-child(4) { z-index: 1; }
+.index-card:nth-child(1) { z-index: 4; --stack-offset: -26px; }
+.index-card:nth-child(2) { z-index: 3; --stack-offset: -10px; }
+.index-card:nth-child(3) { z-index: 2; --stack-offset: 10px; }
+.index-card:nth-child(4) { z-index: 1; --stack-offset: 26px; }
 .index-card::before,
 .index-card::after { content: none; }
 .index-card:not(.is-visible) { transition-delay: var(--index-delay, 0ms); }
-.index-card.is-visible { opacity: 1; transform: none; }
+.index-card.is-visible { opacity: 1; transform: translateX(var(--stack-offset)) translateY(0) scale(1); }
 .index-stack:has(.index-card:hover) .index-card:not(:hover),
 .index-stack:has(.index-card:focus-visible) .index-card:not(:focus-visible) {
   opacity: .88;
@@ -371,7 +372,7 @@ figure, p, h1, h2, h3 { margin: 0; }
 .index-card:hover,
 .index-card:focus-visible {
   z-index: 20;
-  transform: translate3d(5px,-3px,10px) scale(1.002);
+  transform: translateX(calc(var(--stack-offset) + 5px)) translateY(-3px) scale(1.002);
   background: var(--cream);
   border-color: rgba(49,39,38,.27);
   outline: none;
@@ -491,9 +492,25 @@ figure, p, h1, h2, h3 { margin: 0; }
 .porsche-shot--h { grid-column: 1 / 5; }
 .porsche-shot--i { grid-column: 5 / 9; margin-top: 4vw; }
 .porsche-shot--j { grid-column: 9 / 13; }
-.porsche-shot--k { grid-column: 1 / 8; }
-.porsche-shot--l { grid-column: 8 / 13; margin-top: 6vw; }
-.services-block { padding-top: clamp(100px, 12vw, 180px); }
+.porsche-shot--k { grid-column: auto; }
+.porsche-closing {
+  padding-top: clamp(70px, 8vw, 120px);
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0,1fr));
+  column-gap: var(--gutter);
+  row-gap: clamp(30px, 4vw, 56px);
+  align-items: start;
+}
+.porsche-closing .porsche-shot--k {
+  grid-column: 2 / 7;
+}
+.porsche-closing .services-block {
+  grid-column: 1 / 11;
+  padding-top: 0;
+}
+.services-block { padding-top: 0; }
+.porsche-closing .services-lead { max-width: 34rem; }
+.porsche-closing .editorial-copy { max-width: 48rem; }
 .services-lead {
   max-width: 12ch;
   margin-top: var(--s4);
@@ -517,6 +534,9 @@ figure, p, h1, h2, h3 { margin: 0; }
 .services-list { max-width: 820px; margin-left: auto; }
 .services-list > div { border-color: var(--line-dark); }
 .services-list > div:last-child { border-color: var(--line-dark); }
+.services-block .editorial-copy { margin-top: var(--s4); max-width: 46rem; }
+.services-block .editorial-copy + .editorial-copy { margin-top: var(--s3); }
+.services-block .micro-note { margin-top: var(--s4); max-width: 38rem; }
 
 /* ARCHIVE BRIDGE */
 .archive-bridge { height: 58svh; }
@@ -1014,8 +1034,27 @@ figure, p, h1, h2, h3 { margin: 0; }
   transition: opacity .3s ease, visibility .3s ease;
 }
 .lightbox.is-open { opacity: 1; visibility: visible; }
-.lightbox__stage { width: calc(100vw - 176px); height: calc(100dvh - 104px); display: grid; place-items: center; padding: 8px; overflow: hidden; }
-.lightbox__stage img { display: block; width: 100%; height: 100%; max-width: 100%; max-height: 100%; object-fit: contain; object-position: 50% 50%; }
+.lightbox__stage {
+  width: min(1280px, calc(100vw - 176px));
+  height: calc(100dvh - 104px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  overflow: hidden;
+}
+.lightbox__stage img {
+  display: block;
+  width: auto !important;
+  height: auto !important;
+  max-width: min(100%, calc(100vw - 224px));
+  max-height: calc(100dvh - 152px);
+  min-width: 0;
+  min-height: 0;
+  aspect-ratio: auto;
+  object-fit: contain !important;
+  object-position: 50% 50%;
+}
 .lightbox__close, .lightbox__nav {
   position: absolute;
   z-index: 2;
@@ -1058,6 +1097,10 @@ body.lightbox-open { overflow: hidden; }
   .index { padding-bottom: 90px; }
   .index { margin-top: -92px; }
   .index-card { min-height: 86px; padding: 17px 18px; grid-template-columns: 42px minmax(0,1fr); border-radius: 16px; }
+  .index-card:nth-child(1) { --stack-offset: -12px; }
+  .index-card:nth-child(2) { --stack-offset: -4px; }
+  .index-card:nth-child(3) { --stack-offset: 4px; }
+  .index-card:nth-child(4) { --stack-offset: 12px; }
   .index-card + .index-card { margin-top: -6px; }
   .index-card__title { font-size: 21px; }
   .project-intro { grid-template-columns: repeat(4,minmax(0,1fr)); row-gap: var(--s4); padding-top: 92px; padding-bottom: 70px; }
@@ -1065,7 +1108,6 @@ body.lightbox-open { overflow: hidden; }
   .porsche-grid { grid-template-columns: repeat(4,minmax(0,1fr)); row-gap: 56px; }
   .porsche-grid .porsche-shot { grid-column: 1 / 5 !important; margin-top: 0 !important; }
   .services-lead { max-width: none; }
-  .services-list { margin-left: 0; }
   .technical-list > div { grid-template-columns: 1fr 2.2fr; }
   .archive-bridge { height: 48svh; }
   .archive-bridge__sticky { min-height: 48svh; }
@@ -1126,7 +1168,11 @@ body.lightbox-open { overflow: hidden; }
   .correspondence__title { font-size: clamp(40px, 10.8vw, 64px); line-height: .92; letter-spacing: -.065em; max-width: 100%; }
   .correspondence-links a { grid-template-columns: 1fr; }
   .correspondence-links strong { grid-column: 1; grid-row: 2; padding-top: 4px; }
-  .lightbox__stage { width: calc(100vw - 38px); height: calc(100vh - 130px); }
+  .porsche-closing { grid-template-columns: repeat(4,minmax(0,1fr)); row-gap: var(--s4); padding-top: clamp(54px, 8vw, 80px); }
+  .porsche-closing .porsche-shot--k,
+  .porsche-closing .services-block { grid-column: 1 / 5; }
+  .lightbox__stage { width: calc(100vw - 32px); height: calc(100vh - 130px); padding: 10px; }
+  .lightbox__stage img { max-width: calc(100vw - 44px); max-height: calc(100vh - 162px); }
   .lightbox__nav { top: auto; bottom: 30px; transform: none; }
   .lightbox__nav--prev { left: 28px; }
   .lightbox__nav--next { right: 28px; }
