@@ -1,26 +1,13 @@
-FILIPE ARCHIVE — V22 HELVETICA CONSISTENCY UPDATE
+FILIPE ARCHIVE — v24 UPDATE
 
-This update preserves the V21 website and only changes the sans-serif font loading.
+Replace only these three files in the existing GitHub website folder:
+- index.html
+- styles.css
+- app.js
 
-1. Replace these three files in your current V21 website folder:
-   - index.html
-   - styles.css
-   - app.js
+Keep the existing assets folder and CNAME unchanged.
 
-2. In your existing assets/fonts folder, add the Helvetica files you already own:
-   - Helvetica.ttf
-   - helvetica-light-587ebe5a59211.ttf
-   - Helvetica-Bold.ttf
-   - Helvetica-Oblique.ttf
-   - Helvetica-BoldOblique.ttf
-
-3. Do not use these two variants for the main site:
-   - helvetica-compressed-5871d14b6903a.otf
-   - helvetica-rounded-bold-5871d05ead8de.otf
-
-4. Keep all existing Apple Garamond files already present in assets/fonts.
-
-5. Commit and push to GitHub Pages as usual.
-
-The CSS and JS cache versions have been bumped to v22 so browsers fetch the new files.
-The V21 video autoplay stability code remains unchanged.
+Changes in v24:
+1. Kuru Toga / One Archive title is reversible on hover after its entrance animation.
+2. Index cards reveal one after another at a slower, more deliberate pace.
+3. CSS and JS cache versions updated to v24 so the live site loads the changes.

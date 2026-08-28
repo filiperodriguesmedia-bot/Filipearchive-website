@@ -146,20 +146,33 @@
   }
 
   // ---------------------------------------------------------------------
-  // Index stagger.
+  // Index stagger. The sequence is deliberately held until a substantial
+  // part of the Index is already inside the viewport, so the visitor sees
+  // the cards arrive rather than finding the animation already finished.
   // ---------------------------------------------------------------------
   const indexCards = [...document.querySelectorAll('[data-index-card]')];
-  indexCards.forEach((card, i) => card.style.setProperty('--index-delay', `${i * 105}ms`));
+  indexCards.forEach(card => card.style.setProperty('--index-delay', '0ms'));
   if (reduceMotion) {
     indexCards.forEach(card => card.classList.add('is-visible'));
   } else if (indexCards.length) {
-    const indexObserver = new IntersectionObserver((entries, obs) => {
-      if (entries.some(e => e.isIntersecting)) {
-        indexCards.forEach(card => card.classList.add('is-visible'));
+    const indexStack = document.querySelector('.index-stack');
+    let indexPlayed = false;
+    const playIndex = () => {
+      if (indexPlayed) return;
+      indexPlayed = true;
+      indexCards.forEach((card, i) => {
+        window.setTimeout(() => card.classList.add('is-visible'), 160 + i * 430);
+      });
+    };
+    if (indexStack) {
+      const indexObserver = new IntersectionObserver((entries, obs) => {
+        const visible = entries.some(entry => entry.isIntersecting && entry.intersectionRatio >= 0.42);
+        if (!visible) return;
+        playIndex();
         obs.disconnect();
-      }
-    }, { threshold: 0.2 });
-    indexObserver.observe(document.querySelector('.index-stack'));
+      }, { threshold: [0.42, 0.55], rootMargin: '0px 0px -8% 0px' });
+      indexObserver.observe(indexStack);
+    }
   }
 
   // ---------------------------------------------------------------------
@@ -225,52 +238,125 @@
     card.addEventListener('pointerleave', () => card.classList.remove('is-hovered'));
   });
   // ---------------------------------------------------------------------
-  // One Archive -> Kuru Toga: one-time section trigger, not scroll-scrubbed.
+  // One Archive -> Kuru Toga. The first change happens once on section
+  // entrance. After that, hovering the title reverses it to One Archive,
+  // mirroring the state-locked interaction used by the hero title.
   // ---------------------------------------------------------------------
   const bridge = document.querySelector('[data-archive-bridge]');
   if (bridge) {
+    const words = bridge.querySelector('.archive-bridge__words');
     const one = bridge.querySelector('.archive-bridge__one');
     const kuru = bridge.querySelector('.archive-bridge__kuru');
-    const showFinal = () => {
-      if (!one || !kuru) return;
-      one.style.opacity = '0';
-      one.style.filter = 'blur(8px)';
-      one.style.transform = 'translateY(-18px)';
-      kuru.style.opacity = '1';
-      kuru.style.filter = 'blur(0px)';
-      kuru.style.transform = 'translateY(0)';
-    };
-    if (reduceMotion) {
-      showFinal();
-    } else {
-      let played = false;
-      const playBridge = () => {
-        if (played || !one || !kuru) return;
-        played = true;
-        one.style.opacity = '1';
+
+    if (words && one && kuru) {
+      const renderBridgeGlyphs = (layer, text) => {
+        layer.innerHTML = [...text].map(ch => ch === ' '
+          ? '<span class="archive-glyph space">&nbsp;</span>'
+          : `<span class="archive-glyph">${ch}</span>`
+        ).join('');
+      };
+      renderBridgeGlyphs(one, 'One Archive.');
+      renderBridgeGlyphs(kuru, 'Kuru Toga');
+
+      let bridgeState = 'one';
+      let bridgeDesired = 'one';
+      let bridgeLocked = false;
+      let bridgePlayed = false;
+      let bridgeInteractive = false;
+
+      const setBridgeInstant = (to) => {
+        const showOne = to === 'one';
+        one.style.opacity = showOne ? '1' : '0';
         one.style.filter = 'blur(0px)';
         one.style.transform = 'translateY(0)';
-        kuru.style.opacity = '0';
-        kuru.style.filter = 'blur(8px)';
-        kuru.style.transform = 'translateY(16px)';
-        window.setTimeout(() => {
-          one.animate([
-            { opacity: 1, filter: 'blur(0px)', transform: 'translateY(0)' },
-            { opacity: 0, filter: 'blur(8px)', transform: 'translateY(-18px)' }
-          ], { duration: 560, easing: 'cubic-bezier(.16,.86,.24,1)', fill: 'forwards' });
-          kuru.animate([
-            { opacity: 0, filter: 'blur(8px)', transform: 'translateY(16px)' },
-            { opacity: 1, filter: 'blur(0px)', transform: 'translateY(0)' }
-          ], { duration: 820, delay: 150, easing: 'cubic-bezier(.16,.86,.24,1)', fill: 'forwards' });
-          window.setTimeout(showFinal, 980);
-        }, 260);
+        kuru.style.opacity = showOne ? '0' : '1';
+        kuru.style.filter = 'blur(0px)';
+        kuru.style.transform = 'translateY(0)';
+        bridgeState = to;
       };
-      const bridgeObserver = new IntersectionObserver((entries, obs) => {
-        if (!entries.some(e => e.isIntersecting)) return;
+
+      async function morphBridge(to) {
+        if (bridgeLocked || bridgeState === to) return;
+        if (reduceMotion) {
+          setBridgeInstant(to);
+          return;
+        }
+
+        bridgeLocked = true;
+        const fromLayer = to === 'kuru' ? one : kuru;
+        const toLayer = to === 'kuru' ? kuru : one;
+        const fromGlyphs = [...fromLayer.querySelectorAll('.archive-glyph')];
+        const toGlyphs = [...toLayer.querySelectorAll('.archive-glyph')];
+
+        fromLayer.style.opacity = '1';
+        toLayer.style.opacity = '1';
+        toGlyphs.forEach((glyph) => {
+          glyph.style.opacity = '0';
+          glyph.style.filter = 'blur(8px)';
+          glyph.style.transform = 'translateY(16px) rotateX(-14deg) scale(.98)';
+        });
+
+        const outgoing = fromGlyphs.map((glyph, i) => glyph.animate([
+          { opacity: 1, filter: 'blur(0px)', transform: 'translateY(0) rotateX(0deg) scale(1)' },
+          { opacity: 0, filter: 'blur(8px)', transform: `translateY(${-12 - (i % 3) * 2}px) rotateX(14deg) scale(.988)` }
+        ], { duration: 620, delay: i * 24, easing: 'cubic-bezier(.16,.86,.24,1)', fill: 'forwards' }));
+
+        await Promise.allSettled(outgoing.map(animation => animation.finished));
+
+        const incoming = toGlyphs.map((glyph, i) => glyph.animate([
+          { opacity: 0, filter: 'blur(8px)', transform: 'translateY(16px) rotateX(-14deg) scale(.98)' },
+          { opacity: 1, filter: 'blur(0px)', transform: 'translateY(0) rotateX(0deg) scale(1)' }
+        ], { duration: 820, delay: i * 46, easing: 'cubic-bezier(.16,.86,.24,1)', fill: 'forwards' }));
+
+        await Promise.allSettled(incoming.map(animation => animation.finished));
+        fromLayer.style.opacity = '0';
+        toLayer.style.opacity = '1';
+        bridgeState = to;
+        bridgeLocked = false;
+        if (bridgeDesired !== bridgeState) morphBridge(bridgeDesired);
+      }
+
+      const playBridge = async () => {
+        if (bridgePlayed) return;
+        bridgePlayed = true;
+        setBridgeInstant('one');
+        if (reduceMotion) {
+          bridgeDesired = 'kuru';
+          setBridgeInstant('kuru');
+          bridgeInteractive = true;
+          return;
+        }
+        // Let One Archive. sit fully readable on screen before the morph.
+        await new Promise(resolve => window.setTimeout(resolve, 850));
+        bridgeDesired = 'kuru';
+        await morphBridge('kuru');
+        bridgeInteractive = true;
+      };
+
+      if (reduceMotion) {
         playBridge();
-        obs.disconnect();
-      }, { threshold: 0.25 });
-      bridgeObserver.observe(bridge);
+      } else {
+        const bridgeObserver = new IntersectionObserver((entries, obs) => {
+          const visible = entries.some(entry => entry.isIntersecting && entry.intersectionRatio >= 0.68);
+          if (!visible) return;
+          playBridge();
+          obs.disconnect();
+        }, { threshold: [0.68, 0.82], rootMargin: '0px 0px -6% 0px' });
+        // Observe the actual title rather than the whole section. This keeps
+        // the one-time animation from firing before the words are visible.
+        bridgeObserver.observe(words);
+      }
+
+      words.addEventListener('mouseenter', () => {
+        if (!bridgeInteractive) return;
+        bridgeDesired = 'one';
+        if (!bridgeLocked && bridgeState !== 'one') morphBridge('one');
+      });
+      words.addEventListener('mouseleave', () => {
+        if (!bridgeInteractive) return;
+        bridgeDesired = 'kuru';
+        if (!bridgeLocked && bridgeState !== 'kuru') morphBridge('kuru');
+      });
     }
   }
 
