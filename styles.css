@@ -1,4 +1,54 @@
 @font-face {
+  font-family: "FA Helvetica";
+  src: url("assets/fonts/helvetica-light-587ebe5a59211.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 200;
+  font-display: swap;
+}
+@font-face {
+  font-family: "FA Helvetica";
+  src: url("assets/fonts/helvetica-light-587ebe5a59211.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+}
+@font-face {
+  font-family: "FA Helvetica";
+  src: url("assets/fonts/Helvetica.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "FA Helvetica";
+  src: url("assets/fonts/Helvetica.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+}
+@font-face {
+  font-family: "FA Helvetica";
+  src: url("assets/fonts/Helvetica-Bold.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: "FA Helvetica";
+  src: url("assets/fonts/Helvetica-Oblique.ttf") format("truetype");
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "FA Helvetica";
+  src: url("assets/fonts/Helvetica-BoldOblique.ttf") format("truetype");
+  font-style: italic;
+  font-weight: 700;
+  font-display: swap;
+}
+
+@font-face {
   font-family: "FA Apple Garamond";
   src: url("assets/fonts/AppleGaramond-Light.ttf") format("truetype");
   font-style: normal;
@@ -53,7 +103,7 @@
   --light-soft: rgba(255, 248, 237, .68);
   --line-dark: rgba(40, 30, 27, .20);
   --line-light: rgba(255, 248, 237, .20);
-  --sans: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --sans: "FA Helvetica", "Helvetica Neue", Helvetica, Arial, sans-serif;
   --serif: "FA Apple Garamond", "Apple Garamond", Garamond, "Iowan Old Style", Baskerville, "Times New Roman", serif;
   --mx: clamp(24px, 5.4vw, 92px);
   --max: 1560px;
@@ -71,6 +121,7 @@
 }
 
 * { box-sizing: border-box; }
+html, body { font-synthesis: none; }
 html { scroll-behavior: smooth; background: var(--brown); }
 body {
   margin: 0;

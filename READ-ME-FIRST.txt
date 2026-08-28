@@ -1,0 +1,26 @@
+FILIPE ARCHIVE — V22 HELVETICA CONSISTENCY UPDATE
+
+This update preserves the V21 website and only changes the sans-serif font loading.
+
+1. Replace these three files in your current V21 website folder:
+   - index.html
+   - styles.css
+   - app.js
+
+2. In your existing assets/fonts folder, add the Helvetica files you already own:
+   - Helvetica.ttf
+   - helvetica-light-587ebe5a59211.ttf
+   - Helvetica-Bold.ttf
+   - Helvetica-Oblique.ttf
+   - Helvetica-BoldOblique.ttf
+
+3. Do not use these two variants for the main site:
+   - helvetica-compressed-5871d14b6903a.otf
+   - helvetica-rounded-bold-5871d05ead8de.otf
+
+4. Keep all existing Apple Garamond files already present in assets/fonts.
+
+5. Commit and push to GitHub Pages as usual.
+
+The CSS and JS cache versions have been bumped to v22 so browsers fetch the new files.
+The V21 video autoplay stability code remains unchanged.
