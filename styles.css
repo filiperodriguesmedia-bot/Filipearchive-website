@@ -244,6 +244,8 @@ figure, p, h1, h2, h3 { margin: 0; }
 }
 .quiet-link:hover { gap: 20px; }
 .quiet-link--light { color: var(--light); }
+.quiet-link--dark { color: var(--brown); border-bottom-color: rgba(49,39,38,.24); }
+.report-quiet-link { margin-top: var(--s4); }
 
 /* Text reveal: lines are wrapped by JS */
 .text-reveal { visibility: hidden; }
@@ -990,7 +992,7 @@ figure, p, h1, h2, h3 { margin: 0; }
   column-gap: var(--gutter);
   align-items: end;
 }
-.report-reward > div { grid-column: 1 / 9; position: relative; z-index: 2; padding-right: clamp(18px, 2vw, 34px); }
+.report-reward > div { grid-column: 1 / 10; position: relative; z-index: 2; padding-right: clamp(18px, 2vw, 34px); }
 .report-reward__title { margin-top: var(--s2); max-width: 12.4ch; overflow: visible; font-size: clamp(36px, 5vw, 78px); line-height: 1; letter-spacing: -.05em; font-weight: 400; }
 .report-card {
   grid-column: 10 / 13;
