@@ -1,13 +1,15 @@
-FILIPE ARCHIVE — v24 UPDATE
+FILIPE ARCHIVE — v38
 
-Replace only these three files in the existing GitHub website folder:
+Replace only these files in the GitHub website folder:
 - index.html
 - styles.css
 - app.js
 
-Keep the existing assets folder and CNAME unchanged.
+Keep assets/ and CNAME unchanged.
 
-Changes in v24:
-1. Kuru Toga / One Archive title is reversible on hover after its entrance animation.
-2. Index cards reveal one after another at a slower, more deliberate pace.
-3. CSS and JS cache versions updated to v24 so the live site loads the changes.
+v38 changes only:
+1. iPhone/mobile divider edges are softer and rounder.
+2. On both desktop and mobile, archive divider navigation appears only after a deliberate upward scroll.
+3. The four dividers reveal one after another with a smooth stagger.
+4. They disappear smoothly with a reverse stagger when scrolling down.
+5. Existing desktop divider geometry and technical labels remain unchanged.

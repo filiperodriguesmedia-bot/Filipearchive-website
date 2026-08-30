@@ -268,6 +268,299 @@ figure, p, h1, h2, h3 { margin: 0; }
   opacity: 1;
 }
 
+
+/* ARCHIVE EDGE NAVIGATION -------------------------------------------------
+   Four clean physical archive divider tabs. Each divider is one true closed
+   white SVG shape. The S-curve itself terminates at the viewport edge: there is
+   no rectangular tail or parallel strip after the curve. No border, shadow,
+   extrusion, duplicate edge, or fake seam. Layering comes only from position
+   and z-index. */
+.archive-nav {
+  position: fixed;
+  z-index: 9000;
+  font-family: var(--sans);
+  color: var(--brown);
+  pointer-events: none;
+}
+.archive-nav__tabs { position: relative; }
+.archive-tab:nth-child(1) { --archive-stagger: 0ms; --archive-stagger-reverse: 210ms; }
+.archive-tab:nth-child(2) { --archive-stagger: 70ms; --archive-stagger-reverse: 140ms; }
+.archive-tab:nth-child(3) { --archive-stagger: 140ms; --archive-stagger-reverse: 70ms; }
+.archive-tab:nth-child(4) { --archive-stagger: 210ms; --archive-stagger-reverse: 0ms; }
+.archive-tab {
+  --archive-face: rgba(255,255,255,.90);
+  --archive-face-active: #fff;
+  --archive-face-muted: rgba(228,225,220,.78);
+  --archive-tab-text: var(--brown);
+  position: absolute;
+  display: block;
+  color: var(--archive-tab-text);
+  text-decoration: none;
+  background: transparent !important;
+  border: 0 !important;
+  outline: 0;
+  box-shadow: none !important;
+  pointer-events: auto;
+  opacity: .90;
+  transform-origin: right center;
+  transition: transform .38s var(--ease), opacity .34s var(--ease-soft), color .34s var(--ease-soft);
+  will-change: transform;
+}
+.archive-tab__svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: hidden;
+}
+.archive-tab__svg path {
+  stroke: none !important;
+  fill: #fff;
+}
+.archive-tab__depth { display: none !important; }
+.archive-tab__face path { fill: var(--archive-face); transition: fill .34s var(--ease-soft); }
+.archive-tab__content {
+  position: absolute;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 11px;
+  white-space: nowrap;
+}
+.archive-tab__number,
+.archive-tab__label {
+  display: inline-block;
+  line-height: 1;
+  text-transform: uppercase;
+  font-weight: 400;
+}
+.archive-tab__number { font-size: 9px; letter-spacing: .12em; }
+.archive-tab__label { font-size: 7.5px; letter-spacing: .115em; opacity: .68; }
+.archive-tab.is-active { opacity: 1; }
+.archive-tab.is-active .archive-tab__face path { fill: var(--archive-face-active); }
+
+/* Desktop: four equal long tabs overlap like real file dividers. */
+@media (min-width: 1180px) {
+  .archive-nav {
+    top: 0;
+    right: 0;
+    width: 54px;
+    height: 100dvh;
+  }
+  .archive-nav__tabs {
+    width: 100%;
+    height: 100%;
+  }
+  .archive-tab {
+    right: 0;
+    width: 54px;
+    height: 32vh;
+    transform: translateX(0);
+  }
+  /* Equal size; only vertical offset changes. Each overlaps the next. */
+  .archive-tab:nth-child(1) { top: 1vh;  z-index: 11; }
+  .archive-tab:nth-child(2) { top: 23vh; z-index: 12; }
+  .archive-tab:nth-child(3) { top: 45vh; z-index: 13; }
+  .archive-tab:nth-child(4) { top: 67vh; z-index: 14; }
+
+  .archive-tab__svg--desktop { display: block; }
+  .archive-tab__svg--mobile { display: none; }
+  .archive-tab__content {
+    top: 50%;
+    left: 31px;
+    transform: translate(-50%,-50%) rotate(90deg);
+    transform-origin: 50% 50%;
+  }
+
+  /* Controlled adaptive contrast. This deliberately avoids mix-blend-mode:
+     the only two material states are translucent white on dark sections and
+     translucent archive brown on light/cream sections. */
+  .archive-tab.archive-tone-light {
+    --archive-face: rgba(49,39,38,.14);
+    --archive-face-active: rgba(49,39,38,.22);
+    --archive-face-muted: rgba(49,39,38,.08);
+    --archive-tab-text: rgba(49,39,38,.94);
+  }
+
+  .archive-tab.is-active {
+    z-index: 30;
+    transform: scaleX(1.035);
+  }
+
+  /* Same reaction language as the opening Index. */
+  .archive-nav__tabs:has(.archive-tab:hover) .archive-tab:not(:hover),
+  .archive-nav__tabs:focus-within .archive-tab:not(:focus-visible) {
+    opacity: .52;
+  }
+  .archive-nav__tabs:has(.archive-tab:hover) .archive-tab:not(:hover) .archive-tab__face path,
+  .archive-nav__tabs:focus-within .archive-tab:not(:focus-visible) .archive-tab__face path {
+    fill: var(--archive-face-muted);
+  }
+  .archive-tab:hover,
+  .archive-tab:focus-visible {
+    z-index: 100 !important;
+    opacity: 1;
+    transform: scaleX(1.09);
+    outline: none;
+  }
+  .archive-tab:hover .archive-tab__face path,
+  .archive-tab:focus-visible .archive-tab__face path { fill: var(--archive-face-active); }
+  .archive-tab:hover .archive-tab__label,
+  .archive-tab:focus-visible .archive-tab__label,
+  .archive-tab.is-active .archive-tab__label { opacity: .88; }
+
+  /* Scroll-direction reveal: tabs enter one after another while remaining
+     anchored to the viewport edge. Reverse stagger is used on the way out. */
+  .archive-nav:not(.is-visible) .archive-tab {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateX(18px) scaleX(.985);
+    transition-delay: var(--archive-stagger-reverse);
+  }
+  .archive-nav.is-visible .archive-tab {
+    transition-delay: var(--archive-stagger);
+  }
+}
+
+/* Touch / iPhone: compact file-divider tabs matching the approved render.
+   Each tab is a broad, shallow, independent sheet hanging from the top edge.
+   The S transition is confined to the lower corners so there are no stems,
+   extrusions or scalloped-header artefacts. */
+@media (max-width: 1179px) {
+  .archive-nav {
+    top: 0;
+    left: 0;
+    right: 0;
+    padding-top: env(safe-area-inset-top, 0px);
+    background: transparent;
+    opacity: 1;
+    visibility: visible;
+  }
+  .archive-nav::before {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: env(safe-area-inset-top, 0px);
+    background: #fff;
+    opacity: 0;
+    transition: opacity .28s var(--ease-soft);
+  }
+  .archive-nav.is-visible::before { opacity: 1; }
+  .archive-nav__tabs {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 3px;
+    width: 100%;
+    height: 54px;
+    padding: 0 5px 2px;
+    overflow: visible;
+    background: transparent;
+  }
+  .archive-tab,
+  .archive-tab:nth-child(1),
+  .archive-tab:nth-child(2),
+  .archive-tab:nth-child(3),
+  .archive-tab:nth-child(4) {
+    --archive-face: #ece8e1;
+    --archive-face-active: #fff;
+    --archive-face-muted: #ece8e1;
+    --archive-tab-text: var(--brown);
+    position: relative;
+    top: auto;
+    left: auto;
+    width: 100%;
+    height: 54px;
+    transform: none;
+    overflow: visible;
+    background: transparent !important;
+  }
+  .archive-tab:nth-child(1) { z-index: 11; }
+  .archive-tab:nth-child(2) { z-index: 12; }
+  .archive-tab:nth-child(3) { z-index: 13; }
+  .archive-tab:nth-child(4) { z-index: 14; }
+
+  .archive-tab__svg--desktop { display: none; }
+  .archive-tab__svg--mobile {
+    display: block;
+    overflow: visible;
+  }
+  .archive-tab__depth { display: none !important; }
+  .archive-tab__face path {
+    fill: #ece8e1;
+    stroke: none !important;
+  }
+  .archive-tab.is-active .archive-tab__face path,
+  .archive-tab:active .archive-tab__face path { fill: #fff; }
+
+  .archive-tab__content {
+    top: 11px;
+    left: 50%;
+    width: calc(100% - 10px);
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    text-align: center;
+  }
+  .archive-tab__number {
+    font-size: 8.5px;
+    letter-spacing: .11em;
+  }
+  .archive-tab__label {
+    display: block;
+    max-width: 92px;
+    margin: 0 auto;
+    white-space: normal;
+    text-wrap: balance;
+    font-size: clamp(5.4px, 1.35vw, 6.7px);
+    line-height: 1.1;
+    letter-spacing: .072em;
+    opacity: .64;
+  }
+  .archive-tab.is-active {
+    z-index: 30;
+    opacity: 1;
+    transform: none;
+  }
+  .archive-tab.is-active .archive-tab__label { opacity: .82; }
+  .archive-tab:active {
+    z-index: 100;
+    opacity: 1;
+    transform: scale(.992);
+  }
+
+  /* Each mobile divider enters independently from the top edge. */
+  .archive-nav:not(.is-visible) .archive-tab {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-18px) scale(.99);
+    transition-delay: var(--archive-stagger-reverse);
+  }
+  .archive-nav.is-visible .archive-tab {
+    transition-delay: var(--archive-stagger);
+  }
+
+  /* Landscape phones need the same object, simply shallower. */
+  @media (orientation: landscape) and (max-height: 560px) {
+    .archive-nav__tabs,
+    .archive-tab,
+    .archive-tab:nth-child(1),
+    .archive-tab:nth-child(2),
+    .archive-tab:nth-child(3),
+    .archive-tab:nth-child(4) { height: 46px; }
+    .archive-nav__tabs { padding-bottom: 1px; }
+    .archive-tab__content { top: 8px; gap: 3px; }
+    .archive-tab__number { font-size: 8px; }
+    .archive-tab__label { font-size: 5.6px; line-height: 1.05; max-width: 104px; }
+  }
+}
+
 /* HERO */
 .hero {
   position: relative;
@@ -1239,6 +1532,9 @@ body.lightbox-open { overflow: hidden; }
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .archive-nav,
+  .archive-tab { transition-duration: .01ms !important; }
+
   .timeline { height: auto; }
   .timeline-pin { position: relative; height: auto; overflow: visible; }
   .timeline-stage { display: block; }

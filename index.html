@@ -2,27 +2,52 @@
 <html lang="en-GB" translate="no" class="notranslate">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="google" content="notranslate" />
   <meta name="robots" content="index,follow" />
   <meta name="description" content="Filipe Archive · 3D, photography and moving image by Filipe Rodrigues, based near Lisbon." />
   <meta property="og:title" content="Filipe Archive · 3D, Photography & Moving Image" />
   <meta property="og:description" content="A visual archive of 3D, photography, moving image and designed objects by Filipe Rodrigues." />
   <meta property="og:image" content="assets/img/hero-odyssey.webp" />
-  <meta name="theme-color" content="#312726" />
+  <meta name="theme-color" content="#312726" id="theme-color" />
   <title>Filipe Archive · 3D, Photography & Moving Image</title>
   <link rel="preload" href="assets/fonts/Helvetica.ttf" as="font" type="font/ttf" crossorigin />
   <link rel="preload" href="assets/fonts/helvetica-light-587ebe5a59211.ttf" as="font" type="font/ttf" crossorigin />
-  <link rel="stylesheet" href="styles.css?v=25" />
+  <link rel="stylesheet" href="styles.css?v=40" />
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
   <div class="screen-edge-blur" aria-hidden="true"></div>
 
+  <nav class="archive-nav" aria-label="Archive chapters" data-archive-nav>
+    <div class="archive-nav__tabs">
+      <a class="archive-tab" href="#porsche" data-archive-tab data-target="porsche" aria-label="Porsche 718">
+        <svg class="archive-tab__svg archive-tab__svg--desktop archive-tab__face" viewBox="0 0 54 280" preserveAspectRatio="none" aria-hidden="true"><path d="M54 0 C54 8 52 15 48 21 C42 30 31 36 25 45 C21 52 19 61 19 72 V208 C19 219 21 228 25 235 C31 244 42 250 48 259 C52 265 54 272 54 280 L54 280 L54 0 Z"/></svg>
+        <svg class="archive-tab__svg archive-tab__svg--mobile archive-tab__face" viewBox="0 0 280 64" preserveAspectRatio="none" aria-hidden="true"><path d="M0 0 H280 V17 C280 25 279 30 275 36 C270 43 267 48 267 55 C267 59 263 61 258 61 H22 C17 61 13 59 13 55 C13 48 10 43 5 36 C1 30 0 25 0 17 Z"/></svg>
+        <span class="archive-tab__content"><span class="archive-tab__number">01</span><span class="archive-tab__label">AUTOMOTIVE PHOTOGRAPHY</span></span>
+      </a>
+      <a class="archive-tab" href="#kuru" data-archive-tab data-target="kuru" aria-label="Kuru Toga">
+        <svg class="archive-tab__svg archive-tab__svg--desktop archive-tab__face" viewBox="0 0 54 280" preserveAspectRatio="none" aria-hidden="true"><path d="M54 0 C54 8 52 15 48 21 C42 30 31 36 25 45 C21 52 19 61 19 72 V208 C19 219 21 228 25 235 C31 244 42 250 48 259 C52 265 54 272 54 280 L54 280 L54 0 Z"/></svg>
+        <svg class="archive-tab__svg archive-tab__svg--mobile archive-tab__face" viewBox="0 0 280 64" preserveAspectRatio="none" aria-hidden="true"><path d="M0 0 H280 V17 C280 25 279 30 275 36 C270 43 267 48 267 55 C267 59 263 61 258 61 H22 C17 61 13 59 13 55 C13 48 10 43 5 36 C1 30 0 25 0 17 Z"/></svg>
+        <span class="archive-tab__content"><span class="archive-tab__number">02</span><span class="archive-tab__label">PRODUCT FILM · 3D</span></span>
+      </a>
+      <a class="archive-tab" href="#odyssey" data-archive-tab data-target="odyssey" aria-label="Odyssey Ship">
+        <svg class="archive-tab__svg archive-tab__svg--desktop archive-tab__face" viewBox="0 0 54 280" preserveAspectRatio="none" aria-hidden="true"><path d="M54 0 C54 8 52 15 48 21 C42 30 31 36 25 45 C21 52 19 61 19 72 V208 C19 219 21 228 25 235 C31 244 42 250 48 259 C52 265 54 272 54 280 L54 280 L54 0 Z"/></svg>
+        <svg class="archive-tab__svg archive-tab__svg--mobile archive-tab__face" viewBox="0 0 280 64" preserveAspectRatio="none" aria-hidden="true"><path d="M0 0 H280 V17 C280 25 279 30 275 36 C270 43 267 48 267 55 C267 59 263 61 258 61 H22 C17 61 13 59 13 55 C13 48 10 43 5 36 C1 30 0 25 0 17 Z"/></svg>
+        <span class="archive-tab__content"><span class="archive-tab__number">03</span><span class="archive-tab__label">CONCEPT DESIGN · WORLD-BUILDING</span></span>
+      </a>
+      <a class="archive-tab" href="#profile" data-archive-tab data-target="profile" aria-label="Portfolio and profile">
+        <svg class="archive-tab__svg archive-tab__svg--desktop archive-tab__face" viewBox="0 0 54 280" preserveAspectRatio="none" aria-hidden="true"><path d="M54 0 C54 8 52 15 48 21 C42 30 31 36 25 45 C21 52 19 61 19 72 V208 C19 219 21 228 25 235 C31 244 42 250 48 259 C52 265 54 272 54 280 L54 280 L54 0 Z"/></svg>
+        <svg class="archive-tab__svg archive-tab__svg--mobile archive-tab__face" viewBox="0 0 280 64" preserveAspectRatio="none" aria-hidden="true"><path d="M0 0 H280 V17 C280 25 279 30 275 36 C270 43 267 48 267 55 C267 59 263 61 258 61 H22 C17 61 13 59 13 55 C13 48 10 43 5 36 C1 30 0 25 0 17 Z"/></svg>
+        <span class="archive-tab__content"><span class="archive-tab__number">04</span><span class="archive-tab__label">SELECTED WORK · PDF</span></span>
+      </a>
+    </div>
+  </nav>
+
   <main id="main">
     <!-- HERO -------------------------------------------------------------- -->
     <section class="hero section-dark" id="top" aria-labelledby="hero-title">
-      <video class="hero__video" autoplay muted loop playsinline preload="auto" poster="assets/img/water-poster.webp" aria-hidden="true">
+      <video class="hero__video" data-ambient-video autoplay muted loop playsinline preload="auto" poster="assets/img/water-poster.webp" aria-hidden="true">
         <source src="assets/video/water-loop.mp4" type="video/mp4" />
       </video>
       <div class="hero__brown-veil" aria-hidden="true"></div>
@@ -428,7 +453,7 @@
 
     <!-- MUSIC ------------------------------------------------------------ -->
     <section class="music" id="music" aria-labelledby="music-title" data-music>
-      <video class="music__video" autoplay muted loop playsinline preload="auto" poster="assets/img/water-poster.webp" aria-hidden="true">
+      <video class="music__video" data-ambient-video autoplay muted loop playsinline preload="auto" poster="assets/img/water-poster.webp" aria-hidden="true">
         <source src="assets/video/water-loop.mp4" type="video/mp4" />
       </video>
       <div class="music__veil" aria-hidden="true"></div>
@@ -600,6 +625,6 @@
     <p class="lightbox__count" data-lightbox-count></p>
   </div>
 
-  <script src="app.js?v=25" defer></script>
+  <script src="app.js?v=40" defer></script>
 </body>
 </html>

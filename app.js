@@ -486,15 +486,39 @@
   
   // ---------------------------------------------------------------------
   // Resilient ambient-video autoplay.
-  // Safari can restore a page with a muted autoplay video in a paused state,
-  // especially after refresh, back/forward cache, tab switching or a slow
-  // media response. Reassert the autoplay contract whenever the video/page
-  // becomes usable, and keep a very light watchdog as a final safeguard.
+  // Safari/iOS can restore muted background video in a paused or suspended
+  // state after refresh, back/forward cache, tab switching, orientation
+  // changes, memory pressure, or slow media attachment. This controller keeps
+  // the decorative Hero and Music loops alive without touching the user-
+  // controlled Kuru film.
   // ---------------------------------------------------------------------
-  const ambientVideos = [...document.querySelectorAll('video[autoplay][muted]')];
+  const ambientVideos = [...document.querySelectorAll('[data-ambient-video]')];
   if (ambientVideos.length) {
-    const attemptPlay = (video) => {
-      if (!video || document.hidden) return;
+    const retryTimers = new WeakMap();
+    const lastForcedLoad = new WeakMap();
+
+    const isNearViewport = (video) => {
+      const rect = video.getBoundingClientRect();
+      return rect.bottom > -window.innerHeight * .35 && rect.top < window.innerHeight * 1.35;
+    };
+
+    const clearRetry = (video) => {
+      const timer = retryTimers.get(video);
+      if (timer) window.clearTimeout(timer);
+      retryTimers.delete(video);
+    };
+
+    const scheduleRetry = (video, delay = 420) => {
+      if (!video || document.hidden || !isNearViewport(video)) return;
+      clearRetry(video);
+      const timer = window.setTimeout(() => {
+        retryTimers.delete(video);
+        attemptPlay(video, true);
+      }, delay);
+      retryTimers.set(video, timer);
+    };
+
+    const enforceAmbientAttributes = (video) => {
       video.muted = true;
       video.defaultMuted = true;
       video.autoplay = true;
@@ -505,67 +529,113 @@
       video.setAttribute('loop', '');
       video.setAttribute('playsinline', '');
       video.setAttribute('webkit-playsinline', '');
-
-      // If Safari has not attached the media resource after a refresh, force
-      // one load cycle. Do not reload videos that already have buffered data.
-      if (video.readyState === HTMLMediaElement.HAVE_NOTHING && video.networkState !== HTMLMediaElement.NETWORK_LOADING) {
-        try { video.load(); } catch (_) {}
-      }
-
-      const promise = video.play();
-      if (promise && typeof promise.catch === 'function') promise.catch(() => {});
+      video.setAttribute('preload', 'auto');
     };
 
-    const restartAll = () => ambientVideos.forEach(attemptPlay);
+    function attemptPlay(video, allowLoad = false) {
+      if (!video || document.hidden || !isNearViewport(video)) return;
+      enforceAmbientAttributes(video);
+
+      // Only force a fresh media attachment when Safari genuinely has no
+      // resource. Throttle load() because calling it repeatedly resets buffer.
+      if (allowLoad && video.readyState === HTMLMediaElement.HAVE_NOTHING) {
+        const now = performance.now();
+        const last = lastForcedLoad.get(video) || 0;
+        if (now - last > 2600) {
+          lastForcedLoad.set(video, now);
+          try { video.load(); } catch (_) {}
+        }
+      }
+
+      let playPromise;
+      try { playPromise = video.play(); } catch (_) {
+        scheduleRetry(video, 650);
+        return;
+      }
+
+      if (playPromise && typeof playPromise.then === 'function') {
+        playPromise.then(() => {
+          clearRetry(video);
+          video.classList.add('is-playing');
+        }).catch(() => {
+          video.classList.remove('is-playing');
+          scheduleRetry(video, 700);
+        });
+      }
+    }
+
+    const restartVisible = (allowLoad = false) => {
+      ambientVideos.forEach(video => {
+        if (isNearViewport(video) && (video.paused || video.ended || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA)) {
+          attemptPlay(video, allowLoad);
+        }
+      });
+    };
+
+    const stagedRestart = (allowLoad = false) => {
+      [0, 120, 420, 950, 1800, 3200].forEach((delay, i) => {
+        window.setTimeout(() => restartVisible(allowLoad && i >= 2), delay);
+      });
+    };
 
     ambientVideos.forEach((video) => {
-      ['loadedmetadata', 'loadeddata', 'canplay', 'canplaythrough', 'waiting', 'stalled', 'ended'].forEach(evt => {
+      enforceAmbientAttributes(video);
+
+      ['loadedmetadata', 'loadeddata', 'canplay', 'canplaythrough'].forEach(evt => {
         video.addEventListener(evt, () => attemptPlay(video), { passive: true });
       });
-      video.addEventListener('pause', () => {
-        if (!document.hidden) requestAnimationFrame(() => attemptPlay(video));
+
+      video.addEventListener('playing', () => {
+        clearRetry(video);
+        video.classList.add('is-playing');
+      }, { passive: true });
+
+      ['pause', 'waiting', 'stalled', 'suspend', 'ended'].forEach(evt => {
+        video.addEventListener(evt, () => {
+          video.classList.remove('is-playing');
+          if (!document.hidden && isNearViewport(video)) scheduleRetry(video, evt === 'pause' ? 180 : 420);
+        }, { passive: true });
       });
+
       video.addEventListener('error', () => {
-        window.setTimeout(() => {
-          try { video.load(); } catch (_) {}
-          attemptPlay(video);
-        }, 350);
-      });
-      attemptPlay(video);
+        video.classList.remove('is-playing');
+        scheduleRetry(video, 750);
+      }, { passive: true });
+
+      attemptPlay(video, true);
     });
 
-    // Restart when a section containing an ambient video approaches view.
     if ('IntersectionObserver' in window) {
       const videoObserver = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
-          if (entry.isIntersecting) attemptPlay(entry.target);
+          if (entry.isIntersecting) attemptPlay(entry.target, true);
+          else clearRetry(entry.target);
         });
-      }, { rootMargin: '30% 0px 30% 0px', threshold: 0 });
+      }, { rootMargin: '35% 0px 35% 0px', threshold: 0 });
       ambientVideos.forEach(video => videoObserver.observe(video));
     }
 
     document.addEventListener('visibilitychange', () => {
-      if (!document.hidden) restartAll();
+      if (!document.hidden) stagedRestart(true);
     });
-    window.addEventListener('focus', restartAll);
-    window.addEventListener('pageshow', restartAll);
-    window.addEventListener('load', restartAll, { once: true });
+    window.addEventListener('focus', () => stagedRestart(true));
+    window.addEventListener('pageshow', () => stagedRestart(true));
+    window.addEventListener('load', () => stagedRestart(true), { once: true });
+    window.addEventListener('online', () => stagedRestart(true));
+    window.addEventListener('orientationchange', () => window.setTimeout(() => stagedRestart(false), 220));
 
-    // If browser policy delayed autoplay, the first genuine interaction gets
-    // another chance without changing the user's scroll or playback controls.
-    ['pointerdown', 'touchstart', 'keydown'].forEach(evt => {
-      window.addEventListener(evt, restartAll, { once: true, passive: evt !== 'keydown' });
+    // A browser can still reject autoplay by policy (notably iOS Low Power
+    // Mode). The first genuine interaction is therefore another safe retry.
+    ['pointerdown', 'touchstart'].forEach(evt => {
+      window.addEventListener(evt, () => stagedRestart(true), { once: true, passive: true });
     });
+    window.addEventListener('keydown', () => stagedRestart(true), { once: true });
 
-    // Very light safety check for the intermittent Safari refresh case.
+    // Light watchdog for the intermittent refresh/suspension case. It only
+    // touches videos close to the viewport and does not reload buffered media.
     window.setInterval(() => {
-      if (document.hidden) return;
-      ambientVideos.forEach(video => {
-        const rect = video.getBoundingClientRect();
-        const nearViewport = rect.bottom > -window.innerHeight * .25 && rect.top < window.innerHeight * 1.25;
-        if (nearViewport && (video.paused || video.ended)) attemptPlay(video);
-      });
-    }, 1800);
+      if (!document.hidden) restartVisible(false);
+    }, 1600);
   }
 
 // ---------------------------------------------------------------------
@@ -718,6 +788,150 @@
       timelineChapters.forEach(chapter => chapter.setAttribute('aria-hidden', 'false'));
     }
   }
+
+  // ---------------------------------------------------------------------
+  // Archive edge navigation. This is intentionally a physical echo of the
+  // opening Index rather than a conventional sticky navbar.
+  // ---------------------------------------------------------------------
+  const archiveNav = document.querySelector('[data-archive-nav]');
+  const archiveTabs = [...document.querySelectorAll('[data-archive-tab]')];
+  const themeMeta = document.querySelector('meta[name="theme-color"]');
+  const archiveIndex = document.querySelector('#index');
+  const archiveTargets = archiveTabs
+    .map(tab => ({ tab, target: document.getElementById(tab.dataset.target || '') }))
+    .filter(item => item.target);
+  const archiveToneSections = [...document.querySelectorAll('main > section')];
+
+  let navLastY = Math.max(0, window.scrollY);
+  let navUpTravel = 0;
+  let navDownTravel = 0;
+  let navSuppressedUntil = 0;
+  let archiveNavVisible = false;
+  let navRaf = 0;
+
+  const isArchiveNavMobile = () => window.matchMedia('(max-width: 1179px)').matches;
+
+  function setArchiveNavVisible(visible) {
+    if (!archiveNav) return;
+    archiveNavVisible = visible;
+    archiveNav.classList.toggle('is-visible', visible);
+    if (themeMeta) {
+      themeMeta.setAttribute('content', visible && isArchiveNavMobile() ? '#ffffff' : '#312726');
+    }
+  }
+
+  function updateArchiveTones() {
+    if (!archiveTabs.length) return;
+
+    // Mobile keeps the approved fixed white/off-white treatment. Adaptive
+    // colouring is reserved for the vertical desktop dividers only.
+    if (isArchiveNavMobile()) {
+      archiveTabs.forEach(tab => tab.classList.remove('archive-tone-light'));
+      return;
+    }
+
+    archiveTabs.forEach(tab => {
+      const rect = tab.getBoundingClientRect();
+      const probeY = rect.top + rect.height * .5;
+      let sectionBehind = null;
+
+      for (const section of archiveToneSections) {
+        const sectionRect = section.getBoundingClientRect();
+        if (probeY >= sectionRect.top && probeY <= sectionRect.bottom) {
+          sectionBehind = section;
+          break;
+        }
+      }
+
+      const isLight = !!sectionBehind?.classList.contains('section-cream');
+      tab.classList.toggle('archive-tone-light', isLight);
+    });
+  }
+
+  function updateArchiveActive() {
+    if (!archiveTargets.length) return;
+    const probe = window.scrollY + window.innerHeight * .43;
+    let active = null;
+    archiveTargets.forEach(item => {
+      if (item.target.offsetTop <= probe) active = item;
+    });
+    archiveTabs.forEach(tab => {
+      const isActive = active?.tab === tab;
+      tab.classList.toggle('is-active', isActive);
+      if (isActive) tab.setAttribute('aria-current', 'location');
+      else tab.removeAttribute('aria-current');
+    });
+  }
+
+  function updateArchiveNavOnScroll() {
+    navRaf = 0;
+    const y = Math.max(0, window.scrollY);
+    const delta = y - navLastY;
+    navLastY = y;
+    updateArchiveActive();
+    updateArchiveTones();
+
+    if (!archiveNav) return;
+    if (performance.now() < navSuppressedUntil) return;
+
+    const indexGate = archiveIndex
+      ? archiveIndex.offsetTop + archiveIndex.offsetHeight * .72
+      : window.innerHeight;
+
+    if (y <= indexGate || y < 120) {
+      navUpTravel = 0;
+      navDownTravel = 0;
+      if (archiveNavVisible) setArchiveNavVisible(false);
+      return;
+    }
+
+    if (delta < -1) {
+      navUpTravel += Math.abs(delta);
+      navDownTravel = 0;
+      if (navUpTravel >= 34 && !archiveNavVisible) {
+        setArchiveNavVisible(true);
+        navUpTravel = 0;
+      }
+    } else if (delta > 1) {
+      navDownTravel += delta;
+      navUpTravel = 0;
+      if (navDownTravel >= 24 && archiveNavVisible) {
+        setArchiveNavVisible(false);
+        navDownTravel = 0;
+      }
+    }
+  }
+
+  function requestArchiveNavUpdate() {
+    if (!navRaf) navRaf = requestAnimationFrame(updateArchiveNavOnScroll);
+  }
+
+  archiveTabs.forEach(tab => {
+    tab.addEventListener('click', event => {
+      const id = tab.dataset.target;
+      const target = id ? document.getElementById(id) : null;
+      if (!target) return;
+      event.preventDefault();
+      navSuppressedUntil = performance.now() + (reduceMotion ? 120 : 900);
+      setArchiveNavVisible(false);
+      target.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
+      if (history.pushState) history.pushState(null, '', `#${id}`);
+      else location.hash = id;
+    });
+  });
+
+  addEventListener('scroll', requestArchiveNavUpdate, { passive: true });
+  addEventListener('resize', () => {
+    navLastY = Math.max(0, window.scrollY);
+    navUpTravel = 0;
+    navDownTravel = 0;
+    setArchiveNavVisible(false);
+    updateArchiveActive();
+    updateArchiveTones();
+  });
+  setArchiveNavVisible(false);
+  updateArchiveActive();
+  updateArchiveTones();
 
   // ---------------------------------------------------------------------
   // Lightbox with previous/next arrows. Each gallery is derived directly
