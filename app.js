@@ -496,6 +496,28 @@
   if (ambientVideos.length) {
     const retryTimers = new WeakMap();
     const lastForcedLoad = new WeakMap();
+    const playbackState = new WeakMap();
+    const hardRecoveryAt = new WeakMap();
+
+    const getPlaybackState = (video) => {
+      let state = playbackState.get(video);
+      if (!state) {
+        state = {
+          mediaTime: Number.isFinite(video.currentTime) ? video.currentTime : 0,
+          progressedAt: performance.now(),
+          misses: 0
+        };
+        playbackState.set(video, state);
+      }
+      return state;
+    };
+
+    const markProgress = (video) => {
+      const state = getPlaybackState(video);
+      state.mediaTime = Number.isFinite(video.currentTime) ? video.currentTime : state.mediaTime;
+      state.progressedAt = performance.now();
+      state.misses = 0;
+    };
 
     const isNearViewport = (video) => {
       const rect = video.getBoundingClientRect();
@@ -564,12 +586,85 @@
       }
     }
 
-    const restartVisible = (allowLoad = false) => {
-      ambientVideos.forEach(video => {
-        if (isNearViewport(video) && (video.paused || video.ended || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA)) {
-          attemptPlay(video, allowLoad);
+    const softRecoverFrozenVideo = (video) => {
+      if (!video || document.hidden || !isNearViewport(video)) return;
+      enforceAmbientAttributes(video);
+
+      // Safari can occasionally report `paused === false` while the decoded
+      // frame itself has stopped advancing. A one-frame seek is enough to
+      // wake the decoder without visibly restarting the loop.
+      try {
+        const current = Number.isFinite(video.currentTime) ? video.currentTime : 0;
+        const duration = Number.isFinite(video.duration) ? video.duration : 0;
+        if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+          let target = current + 0.034;
+          if (duration > .15 && target >= duration - .04) target = .01;
+          video.currentTime = Math.max(0, target);
         }
-      });
+      } catch (_) {}
+
+      attemptPlay(video, false);
+    };
+
+    const hardRecoverFrozenVideo = (video) => {
+      if (!video || document.hidden || !isNearViewport(video)) return;
+      const now = performance.now();
+      const last = hardRecoveryAt.get(video) || 0;
+      if (now - last < 9000) return;
+      hardRecoveryAt.set(video, now);
+
+      const resumeAt = Number.isFinite(video.currentTime) ? video.currentTime : 0;
+      const restore = () => {
+        try {
+          if (Number.isFinite(video.duration) && video.duration > .2) {
+            video.currentTime = Math.min(resumeAt, Math.max(.01, video.duration - .08));
+          }
+        } catch (_) {}
+        markProgress(video);
+        attemptPlay(video, false);
+      };
+
+      try {
+        video.addEventListener('loadedmetadata', restore, { once: true });
+        video.load();
+      } catch (_) {
+        attemptPlay(video, true);
+      }
+    };
+
+    const inspectPlayback = (video, allowLoad = false) => {
+      if (!video || document.hidden || !isNearViewport(video)) return;
+
+      if (video.paused || video.ended || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+        attemptPlay(video, allowLoad);
+        return;
+      }
+
+      const now = performance.now();
+      const state = getPlaybackState(video);
+      const current = Number.isFinite(video.currentTime) ? video.currentTime : state.mediaTime;
+      const delta = Math.abs(current - state.mediaTime);
+      const loopWrapped = state.mediaTime > .5 && current < .18;
+
+      if (delta > .045 || loopWrapped) {
+        state.mediaTime = current;
+        state.progressedAt = now;
+        state.misses = 0;
+        return;
+      }
+
+      // Do not react to a momentary decode pause. Only intervene after the
+      // media clock has remained effectively frozen for more than ~2 seconds.
+      if (now - state.progressedAt < 2100) return;
+
+      state.misses += 1;
+      state.progressedAt = now;
+      if (state.misses === 1) softRecoverFrozenVideo(video);
+      else hardRecoverFrozenVideo(video);
+    };
+
+    const restartVisible = (allowLoad = false) => {
+      ambientVideos.forEach(video => inspectPlayback(video, allowLoad));
     };
 
     const stagedRestart = (allowLoad = false) => {
@@ -588,7 +683,12 @@
       video.addEventListener('playing', () => {
         clearRetry(video);
         video.classList.add('is-playing');
+        markProgress(video);
       }, { passive: true });
+
+      ['timeupdate', 'seeked'].forEach(evt => {
+        video.addEventListener(evt, () => markProgress(video), { passive: true });
+      });
 
       ['pause', 'waiting', 'stalled', 'suspend', 'ended'].forEach(evt => {
         video.addEventListener(evt, () => {
@@ -635,7 +735,7 @@
     // touches videos close to the viewport and does not reload buffered media.
     window.setInterval(() => {
       if (!document.hidden) restartVisible(false);
-    }, 1600);
+    }, 1250);
   }
 
 // ---------------------------------------------------------------------
