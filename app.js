@@ -5,6 +5,105 @@
   const clamp = (n, min = 0, max = 1) => Math.min(max, Math.max(min, n));
   const lerp = (a, b, t) => a + (b - a) * t;
 
+
+  // ---------------------------------------------------------------------
+  // Opening loader.
+  // Progress reflects the first-frame essentials only: DOM, fonts, poster
+  // and hero video readiness. A quiet timeout prevents slow media from ever
+  // trapping the visitor. The rest of the archive keeps lazy-loading.
+  // ---------------------------------------------------------------------
+  (() => {
+    const root = document.documentElement;
+    const loader = document.querySelector('[data-site-loader]');
+    if (!loader) {
+      root.classList.remove('is-loading');
+      return;
+    }
+
+    const bar = loader.querySelector('[data-loader-bar]');
+    const count = loader.querySelector('[data-loader-count]');
+    const startedAt = performance.now();
+    const minimumVisible = reduceMotion ? 180 : 760;
+    const hardTimeout = 4200;
+    let displayed = 0;
+    let target = 6;
+    let released = false;
+    let raf = 0;
+
+    const paint = () => {
+      displayed += (target - displayed) * 0.11;
+      if (Math.abs(target - displayed) < 0.15) displayed = target;
+      const integer = Math.max(0, Math.min(100, Math.round(displayed)));
+      if (count) count.textContent = String(integer).padStart(2, '0');
+      if (bar) bar.style.transform = `scaleX(${integer / 100})`;
+      if (!released || integer < 100) raf = requestAnimationFrame(paint);
+    };
+    raf = requestAnimationFrame(paint);
+
+    const bump = (value) => { target = Math.max(target, Math.min(96, value)); };
+
+    const domReady = document.readyState === 'loading'
+      ? new Promise(resolve => document.addEventListener('DOMContentLoaded', resolve, { once: true }))
+      : Promise.resolve();
+
+    const fontsReady = document.fonts?.ready
+      ? Promise.race([
+          document.fonts.ready,
+          new Promise(resolve => setTimeout(resolve, 2200))
+        ])
+      : Promise.resolve();
+
+    const posterReady = new Promise(resolve => {
+      const img = new Image();
+      const done = () => resolve();
+      img.onload = done;
+      img.onerror = done;
+      img.src = 'assets/img/water-poster.webp';
+      if (img.complete) done();
+      setTimeout(done, 2400);
+    });
+
+    const heroVideoReady = new Promise(resolve => {
+      const video = document.querySelector('.hero__video');
+      if (!video || video.readyState >= 2) return resolve();
+      const done = () => resolve();
+      video.addEventListener('loadeddata', done, { once: true });
+      video.addEventListener('error', done, { once: true });
+      setTimeout(done, 2800);
+    });
+
+    domReady.then(() => bump(24));
+    fontsReady.then(() => bump(48));
+    posterReady.then(() => bump(72));
+    heroVideoReady.then(() => bump(92));
+
+    const essentials = Promise.allSettled([domReady, fontsReady, posterReady, heroVideoReady]);
+    const timeout = new Promise(resolve => setTimeout(resolve, hardTimeout));
+
+    Promise.race([essentials, timeout]).then(() => {
+      const elapsed = performance.now() - startedAt;
+      const remaining = Math.max(0, minimumVisible - elapsed);
+      setTimeout(() => {
+        target = 100;
+        setTimeout(() => {
+          root.classList.add('loader-leaving');
+          setTimeout(() => {
+            released = true;
+            root.classList.remove('is-loading');
+            root.classList.add('loader-done');
+            // Keep loader-leaving active so the wordmark/progress can never
+            // return to their visible base state during the background fade.
+            loader.setAttribute('aria-hidden', 'true');
+            cancelAnimationFrame(raf);
+            if (count) count.textContent = '100';
+            if (bar) bar.style.transform = 'scaleX(1)';
+          }, reduceMotion ? 120 : 650);
+        }, reduceMotion ? 40 : 180);
+      }, remaining);
+    });
+  })();
+
+
   // ---------------------------------------------------------------------
   // Line-by-line editorial reveal.
   // Uses Range measurements to preserve native wrapping, then rebuilds

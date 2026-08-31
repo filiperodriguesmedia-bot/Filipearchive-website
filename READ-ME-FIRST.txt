@@ -16,3 +16,19 @@ v38 changes only:
 
 
 v67: Chapter bump entry/exit curves refined for zero-sharpness visual joins; grid placement and all other website behavior unchanged.
+
+
+V79 — OPENING LOADER
+- Adds FILIPE ARCHIVE editorial loading screen.
+- Progress 00 → 100 with a single hairline progress rule.
+- Waits only for first-frame essentials (DOM, fonts, water poster and hero video), not the full archive.
+- Hard fallback prevents slow media from trapping the visitor.
+- Blur/fade exit into the existing hero.
+- Reduced-motion fallback included.
+- styles.css and app.js cache versions bumped to v79.
+
+
+v79 loader refinement: the wordmark and progress now remain in their exit state throughout the final background fade, preventing any brief opacity rebound / ghost reappearance.
+
+
+v80 — Loader background changed from brown to the site's warm cream (#fff8ed), with brown typography/progress. All other site behaviour remains unchanged.
