@@ -485,59 +485,27 @@
 
   
   // ---------------------------------------------------------------------
-  // Resilient ambient-video autoplay.
-  // Safari/iOS can restore muted background video in a paused or suspended
-  // state after refresh, back/forward cache, tab switching, orientation
-  // changes, memory pressure, or slow media attachment. This controller keeps
-  // the decorative Hero and Music loops alive without touching the user-
-  // controlled Kuru film.
+  // Ambient water-video reliability controller.
+  // Only the Hero and Music background loops use this. Safari/iOS may keep a
+  // <video> element in a nominal "playing" state while decoded frames stop,
+  // especially after long scrolls, tab restores, bfcache restores or memory
+  // pressure. The controller below tracks *decoded frames* when the browser
+  // exposes requestVideoFrameCallback, deliberately idles far-offscreen loops,
+  // and revives only the loop that is actually near the viewport.
   // ---------------------------------------------------------------------
   const ambientVideos = [...document.querySelectorAll('[data-ambient-video]')];
   if (ambientVideos.length) {
+    const wanted = new WeakMap();
     const retryTimers = new WeakMap();
-    const lastForcedLoad = new WeakMap();
-    const playbackState = new WeakMap();
-    const hardRecoveryAt = new WeakMap();
+    const lastFrameAt = new WeakMap();
+    const lastMediaTime = new WeakMap();
+    const lastHardResetAt = new WeakMap();
+    const frameWatchStarted = new WeakSet();
 
-    const getPlaybackState = (video) => {
-      let state = playbackState.get(video);
-      if (!state) {
-        state = {
-          mediaTime: Number.isFinite(video.currentTime) ? video.currentTime : 0,
-          progressedAt: performance.now(),
-          misses: 0
-        };
-        playbackState.set(video, state);
-      }
-      return state;
-    };
-
-    const markProgress = (video) => {
-      const state = getPlaybackState(video);
-      state.mediaTime = Number.isFinite(video.currentTime) ? video.currentTime : state.mediaTime;
-      state.progressedAt = performance.now();
-      state.misses = 0;
-    };
-
-    const isNearViewport = (video) => {
+    const nearViewport = (video) => {
       const rect = video.getBoundingClientRect();
-      return rect.bottom > -window.innerHeight * .35 && rect.top < window.innerHeight * 1.35;
-    };
-
-    const clearRetry = (video) => {
-      const timer = retryTimers.get(video);
-      if (timer) window.clearTimeout(timer);
-      retryTimers.delete(video);
-    };
-
-    const scheduleRetry = (video, delay = 420) => {
-      if (!video || document.hidden || !isNearViewport(video)) return;
-      clearRetry(video);
-      const timer = window.setTimeout(() => {
-        retryTimers.delete(video);
-        attemptPlay(video, true);
-      }, delay);
-      retryTimers.set(video, timer);
+      const pad = window.innerHeight * .28;
+      return rect.bottom > -pad && rect.top < window.innerHeight + pad;
     };
 
     const enforceAmbientAttributes = (video) => {
@@ -554,188 +522,245 @@
       video.setAttribute('preload', 'auto');
     };
 
-    function attemptPlay(video, allowLoad = false) {
-      if (!video || document.hidden || !isNearViewport(video)) return;
+    const clearRetry = (video) => {
+      const timer = retryTimers.get(video);
+      if (timer) clearTimeout(timer);
+      retryTimers.delete(video);
+    };
+
+    const markFrame = (video, mediaTime = video.currentTime) => {
+      lastFrameAt.set(video, performance.now());
+      if (Number.isFinite(mediaTime)) lastMediaTime.set(video, mediaTime);
+    };
+
+    const shouldPlay = (video) => wanted.get(video) === true && !document.hidden;
+
+    const scheduleRetry = (video, delay = 350) => {
+      if (!shouldPlay(video)) return;
+      clearRetry(video);
+      retryTimers.set(video, setTimeout(() => {
+        retryTimers.delete(video);
+        playAmbient(video, true);
+      }, delay));
+    };
+
+    function playAmbient(video, allowLoad = false) {
+      if (!video || !shouldPlay(video)) return;
       enforceAmbientAttributes(video);
 
-      // Only force a fresh media attachment when Safari genuinely has no
-      // resource. Throttle load() because calling it repeatedly resets buffer.
       if (allowLoad && video.readyState === HTMLMediaElement.HAVE_NOTHING) {
-        const now = performance.now();
-        const last = lastForcedLoad.get(video) || 0;
-        if (now - last > 2600) {
-          lastForcedLoad.set(video, now);
-          try { video.load(); } catch (_) {}
-        }
+        try { video.load(); } catch (_) {}
       }
 
-      let playPromise;
-      try { playPromise = video.play(); } catch (_) {
-        scheduleRetry(video, 650);
+      let promise;
+      try { promise = video.play(); }
+      catch (_) {
+        scheduleRetry(video, 500);
         return;
       }
 
-      if (playPromise && typeof playPromise.then === 'function') {
-        playPromise.then(() => {
+      if (promise && typeof promise.then === 'function') {
+        promise.then(() => {
           clearRetry(video);
           video.classList.add('is-playing');
+          markFrame(video);
         }).catch(() => {
           video.classList.remove('is-playing');
-          scheduleRetry(video, 700);
+          scheduleRetry(video, 650);
         });
       }
     }
 
-    const softRecoverFrozenVideo = (video) => {
-      if (!video || document.hidden || !isNearViewport(video)) return;
+    const softWake = (video) => {
+      if (!shouldPlay(video)) return;
       enforceAmbientAttributes(video);
 
-      // Safari can occasionally report `paused === false` while the decoded
-      // frame itself has stopped advancing. A one-frame seek is enough to
-      // wake the decoder without visibly restarting the loop.
+      // Nudge the media clock by a few milliseconds. This wakes Safari's
+      // decoder without a visible jump and without throwing away the buffer.
       try {
-        const current = Number.isFinite(video.currentTime) ? video.currentTime : 0;
+        const now = Number.isFinite(video.currentTime) ? video.currentTime : 0;
         const duration = Number.isFinite(video.duration) ? video.duration : 0;
         if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
-          let target = current + 0.034;
-          if (duration > .15 && target >= duration - .04) target = .01;
+          let target = now + .012;
+          if (duration > .1 && target >= duration - .025) target = .005;
           video.currentTime = Math.max(0, target);
         }
       } catch (_) {}
-
-      attemptPlay(video, false);
+      playAmbient(video, false);
     };
 
-    const hardRecoverFrozenVideo = (video) => {
-      if (!video || document.hidden || !isNearViewport(video)) return;
+    const hardWake = (video) => {
+      if (!shouldPlay(video)) return;
       const now = performance.now();
-      const last = hardRecoveryAt.get(video) || 0;
-      if (now - last < 9000) return;
-      hardRecoveryAt.set(video, now);
+      const last = lastHardResetAt.get(video) || 0;
+      if (now - last < 7000) {
+        softWake(video);
+        return;
+      }
+      lastHardResetAt.set(video, now);
 
       const resumeAt = Number.isFinite(video.currentTime) ? video.currentTime : 0;
       const restore = () => {
         try {
           if (Number.isFinite(video.duration) && video.duration > .2) {
-            video.currentTime = Math.min(resumeAt, Math.max(.01, video.duration - .08));
+            video.currentTime = Math.min(resumeAt, Math.max(.005, video.duration - .04));
           }
         } catch (_) {}
-        markProgress(video);
-        attemptPlay(video, false);
+        markFrame(video);
+        playAmbient(video, false);
       };
 
       try {
         video.addEventListener('loadedmetadata', restore, { once: true });
         video.load();
       } catch (_) {
-        attemptPlay(video, true);
+        playAmbient(video, true);
       }
     };
 
-    const inspectPlayback = (video, allowLoad = false) => {
-      if (!video || document.hidden || !isNearViewport(video)) return;
+    const startDecodedFrameWatch = (video) => {
+      if (frameWatchStarted.has(video) || typeof video.requestVideoFrameCallback !== 'function') return;
+      frameWatchStarted.add(video);
+
+      const onFrame = (_now, metadata) => {
+        markFrame(video, metadata && Number.isFinite(metadata.mediaTime) ? metadata.mediaTime : video.currentTime);
+        video.requestVideoFrameCallback(onFrame);
+      };
+      video.requestVideoFrameCallback(onFrame);
+    };
+
+    const inspectAmbient = (video) => {
+      if (!shouldPlay(video)) return;
 
       if (video.paused || video.ended || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
-        attemptPlay(video, allowLoad);
+        playAmbient(video, true);
         return;
       }
 
       const now = performance.now();
-      const state = getPlaybackState(video);
-      const current = Number.isFinite(video.currentTime) ? video.currentTime : state.mediaTime;
-      const delta = Math.abs(current - state.mediaTime);
-      const loopWrapped = state.mediaTime > .5 && current < .18;
+      const lastFrame = lastFrameAt.get(video) || now;
+      const previousTime = lastMediaTime.get(video);
+      const currentTime = Number.isFinite(video.currentTime) ? video.currentTime : previousTime;
 
-      if (delta > .045 || loopWrapped) {
-        state.mediaTime = current;
-        state.progressedAt = now;
-        state.misses = 0;
-        return;
+      // requestVideoFrameCallback is the authoritative signal when present.
+      // Otherwise use currentTime as a conservative fallback.
+      if (typeof video.requestVideoFrameCallback !== 'function') {
+        const moved = Number.isFinite(previousTime) && Number.isFinite(currentTime) && Math.abs(currentTime - previousTime) > .035;
+        const wrapped = Number.isFinite(previousTime) && previousTime > .5 && Number.isFinite(currentTime) && currentTime < .15;
+        if (moved || wrapped || !Number.isFinite(previousTime)) {
+          markFrame(video, currentTime);
+          return;
+        }
       }
 
-      // Do not react to a momentary decode pause. Only intervene after the
-      // media clock has remained effectively frozen for more than ~2 seconds.
-      if (now - state.progressedAt < 2100) return;
-
-      state.misses += 1;
-      state.progressedAt = now;
-      if (state.misses === 1) softRecoverFrozenVideo(video);
-      else hardRecoverFrozenVideo(video);
+      const frozenFor = now - lastFrame;
+      if (frozenFor > 3200) hardWake(video);
+      else if (frozenFor > 1500) softWake(video);
     };
 
-    const restartVisible = (allowLoad = false) => {
-      ambientVideos.forEach(video => inspectPlayback(video, allowLoad));
-    };
-
-    const stagedRestart = (allowLoad = false) => {
-      [0, 120, 420, 950, 1800, 3200].forEach((delay, i) => {
-        window.setTimeout(() => restartVisible(allowLoad && i >= 2), delay);
-      });
+    const setWanted = (video, value) => {
+      wanted.set(video, value);
+      if (value) {
+        markFrame(video);
+        playAmbient(video, true);
+      } else {
+        clearRetry(video);
+        video.classList.remove('is-playing');
+        // Intentionally pause far-offscreen loops. Keeping both copies of the
+        // same water video decoding for the whole page increases the chance of
+        // Safari suspending one of them under memory pressure.
+        try { video.pause(); } catch (_) {}
+      }
     };
 
     ambientVideos.forEach((video) => {
       enforceAmbientAttributes(video);
+      startDecodedFrameWatch(video);
+      wanted.set(video, nearViewport(video));
 
-      ['loadedmetadata', 'loadeddata', 'canplay', 'canplaythrough'].forEach(evt => {
-        video.addEventListener(evt, () => attemptPlay(video), { passive: true });
+      ['loadedmetadata', 'loadeddata', 'canplay', 'canplaythrough'].forEach((eventName) => {
+        video.addEventListener(eventName, () => {
+          if (shouldPlay(video)) playAmbient(video, false);
+        }, { passive: true });
       });
 
       video.addEventListener('playing', () => {
         clearRetry(video);
         video.classList.add('is-playing');
-        markProgress(video);
+        markFrame(video);
       }, { passive: true });
 
-      ['timeupdate', 'seeked'].forEach(evt => {
-        video.addEventListener(evt, () => markProgress(video), { passive: true });
-      });
+      video.addEventListener('timeupdate', () => {
+        // Keep this as a fallback for browsers without decoded-frame callbacks.
+        if (typeof video.requestVideoFrameCallback !== 'function') markFrame(video);
+      }, { passive: true });
 
-      ['pause', 'waiting', 'stalled', 'suspend', 'ended'].forEach(evt => {
-        video.addEventListener(evt, () => {
+      ['waiting', 'stalled', 'ended'].forEach((eventName) => {
+        video.addEventListener(eventName, () => {
           video.classList.remove('is-playing');
-          if (!document.hidden && isNearViewport(video)) scheduleRetry(video, evt === 'pause' ? 180 : 420);
+          if (shouldPlay(video)) scheduleRetry(video, eventName === 'waiting' ? 220 : 420);
         }, { passive: true });
       });
 
-      video.addEventListener('error', () => {
+      video.addEventListener('pause', () => {
         video.classList.remove('is-playing');
-        scheduleRetry(video, 750);
+        if (shouldPlay(video)) scheduleRetry(video, 180);
       }, { passive: true });
 
-      attemptPlay(video, true);
+      video.addEventListener('error', () => {
+        video.classList.remove('is-playing');
+        if (shouldPlay(video)) scheduleRetry(video, 650);
+      }, { passive: true });
+
+      if (wanted.get(video)) playAmbient(video, true);
+      else {
+        try { video.pause(); } catch (_) {}
+      }
     });
 
     if ('IntersectionObserver' in window) {
-      const videoObserver = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-          if (entry.isIntersecting) attemptPlay(entry.target, true);
-          else clearRetry(entry.target);
-        });
-      }, { rootMargin: '35% 0px 35% 0px', threshold: 0 });
-      ambientVideos.forEach(video => videoObserver.observe(video));
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => setWanted(entry.target, entry.isIntersecting));
+      }, { rootMargin: '28% 0px 28% 0px', threshold: 0 });
+      ambientVideos.forEach((video) => observer.observe(video));
+    } else {
+      const syncWanted = () => ambientVideos.forEach((video) => setWanted(video, nearViewport(video)));
+      window.addEventListener('scroll', syncWanted, { passive: true });
+      window.addEventListener('resize', syncWanted, { passive: true });
     }
 
+    const reviveVisible = () => {
+      ambientVideos.forEach((video) => {
+        const visible = nearViewport(video);
+        wanted.set(video, visible);
+        if (visible) {
+          markFrame(video);
+          playAmbient(video, true);
+        }
+      });
+    };
+
     document.addEventListener('visibilitychange', () => {
-      if (!document.hidden) stagedRestart(true);
+      if (!document.hidden) setTimeout(reviveVisible, 80);
     });
-    window.addEventListener('focus', () => stagedRestart(true));
-    window.addEventListener('pageshow', () => stagedRestart(true));
-    window.addEventListener('load', () => stagedRestart(true), { once: true });
-    window.addEventListener('online', () => stagedRestart(true));
-    window.addEventListener('orientationchange', () => window.setTimeout(() => stagedRestart(false), 220));
+    window.addEventListener('focus', () => setTimeout(reviveVisible, 80));
+    window.addEventListener('pageshow', () => setTimeout(reviveVisible, 80));
+    window.addEventListener('load', () => setTimeout(reviveVisible, 80), { once: true });
+    window.addEventListener('online', () => setTimeout(reviveVisible, 120));
+    window.addEventListener('orientationchange', () => setTimeout(reviveVisible, 260));
 
-    // A browser can still reject autoplay by policy (notably iOS Low Power
-    // Mode). The first genuine interaction is therefore another safe retry.
-    ['pointerdown', 'touchstart'].forEach(evt => {
-      window.addEventListener(evt, () => stagedRestart(true), { once: true, passive: true });
+    // If autoplay policy temporarily blocks playback, the first real user
+    // gesture gets one more attempt without affecting any user-controlled film.
+    ['pointerdown', 'touchstart', 'keydown'].forEach((eventName) => {
+      window.addEventListener(eventName, reviveVisible, { once: true, passive: eventName !== 'keydown' });
     });
-    window.addEventListener('keydown', () => stagedRestart(true), { once: true });
 
-    // Light watchdog for the intermittent refresh/suspension case. It only
-    // touches videos close to the viewport and does not reload buffered media.
+    // Watch only loops that are supposed to be visible/ready. The decoded-frame
+    // timestamp makes a genuinely frozen frame distinguishable from a normal
+    // buffering or offscreen pause.
     window.setInterval(() => {
-      if (!document.hidden) restartVisible(false);
-    }, 1250);
+      if (!document.hidden) ambientVideos.forEach(inspectAmbient);
+    }, 750);
   }
 
 // ---------------------------------------------------------------------
