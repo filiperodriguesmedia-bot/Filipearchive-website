@@ -13,3 +13,6 @@ v38 changes only:
 3. The four dividers reveal one after another with a smooth stagger.
 4. They disappear smoothly with a reverse stagger when scrolling down.
 5. Existing desktop divider geometry and technical labels remain unchanged.
+
+
+v67: Chapter bump entry/exit curves refined for zero-sharpness visual joins; grid placement and all other website behavior unchanged.

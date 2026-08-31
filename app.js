@@ -992,6 +992,157 @@
     if (event.key === 'ArrowRight') showLightbox(activeIndex + 1);
   });
 
+  // ---------------------------------------------------------------------
+  // Chapter divider geometry — single continuous path.
+  // The entry begins in the outer gutter, reaches full height exactly at the
+  // content shell edge, stays raised inside the grid, then eases back to the
+  // separator at the centre. Two matched cubic Béziers per ramp give a soft
+  // horizontal tangent at BOTH the flat line and plateau, with no hard join.
+  // ---------------------------------------------------------------------
+  const chapterCuts = [...document.querySelectorAll('.chapter-cut')];
+  const chapterShell = document.querySelector('.shell');
+
+  // Quintic "smootherstep" gives the ramp zero velocity AND zero curvature
+  // at both ends. We convert it into short cubic Hermite Bézier segments so
+  // the browser still renders one continuous SVG path, but without the small
+  // shoulder that remained where a normal cubic met the flat separator.
+  function chapterSmoothstep(t) {
+    // 7th-order smoothstep: 35t^4 - 84t^5 + 70t^6 - 20t^7.
+    // It has zero 1st, 2nd and 3rd derivatives at both endpoints, giving a
+    // very soft flat-to-ramp contact without making the ramp physically wide.
+    const t2 = t * t;
+    const t3 = t2 * t;
+    const t4 = t3 * t;
+    return 35 * t4 - 84 * t4 * t + 70 * t4 * t2 - 20 * t4 * t3;
+  }
+
+  function chapterSmoothstepDerivative(t) {
+    // d/dt of the 7th-order smoothstep above.
+    const t2 = t * t;
+    const t3 = t2 * t;
+    return 140 * t3 * (1 - t) * (1 - t) * (1 - t);
+  }
+
+  function chapterRamp(start, end, h, descending) {
+    const r = Math.max(1, end - start);
+    const segments = 12;
+    let d = `L${start.toFixed(2)} ${(descending ? 0 : h).toFixed(2)}`;
+
+    for (let i = 0; i < segments; i += 1) {
+      const t0 = i / segments;
+      const t1 = (i + 1) / segments;
+      const x0 = start + r * t0;
+      const x3 = start + r * t1;
+      const dx = x3 - x0;
+
+      const s0 = chapterSmoothstep(t0);
+      const s1 = chapterSmoothstep(t1);
+      const ds0dx = chapterSmoothstepDerivative(t0) / r;
+      const ds1dx = chapterSmoothstepDerivative(t1) / r;
+
+      const y0 = descending ? h * s0 : h * (1 - s0);
+      const y3 = descending ? h * s1 : h * (1 - s1);
+      const dy0dx = descending ? h * ds0dx : -h * ds0dx;
+      const dy1dx = descending ? h * ds1dx : -h * ds1dx;
+
+      const x1 = x0 + dx / 3;
+      const y1 = y0 + dy0dx * dx / 3;
+      const x2 = x3 - dx / 3;
+      const y2 = y3 - dy1dx * dx / 3;
+
+      d += ` C${x1.toFixed(2)} ${y1.toFixed(2)} ${x2.toFixed(2)} ${y2.toFixed(2)} ${x3.toFixed(2)} ${y3.toFixed(2)}`;
+    }
+
+    return d;
+  }
+
+  function chapterRampUp(start, end, h) {
+    return chapterRamp(start, end, h, false);
+  }
+
+  function chapterRampDown(start, end, h) {
+    return chapterRamp(start, end, h, true);
+  }
+
+  function updateChapterCuts() {
+    if (!chapterCuts.length) return;
+    const shellRect = chapterShell?.getBoundingClientRect();
+
+    chapterCuts.forEach(cut => {
+      const rect = cut.getBoundingClientRect();
+      const w = Math.max(1, rect.width);
+      const h = Math.max(1, rect.height + 5);
+      const desktopSvg = cut.querySelector('.chapter-cut__shape--desktop');
+      const desktopPath = desktopSvg?.querySelector('path');
+      const mobileSvg = cut.querySelector('.chapter-cut__shape--mobile');
+      const mobilePath = mobileSvg?.querySelector('path');
+
+      if (desktopSvg && desktopPath) {
+        const shellEdge = shellRect
+          ? Math.max(24, shellRect.left - rect.left)
+          : Math.max(24, parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--mx')) || 24);
+        // Give the separator a real flat-to-ramp transition. The previous
+        // curve was mathematically tangent, but the run was too short, so the
+        // eye still read a sudden shoulder. Keep the exact grid datum, but let
+        // the easing begin much earlier in the outer gutter and finish just as
+        // gradually toward the centre.
+        const targetRun = Math.min(168, Math.max(128, w * .082));
+        const outerRoom = Math.max(1, shellEdge - 24);
+        const centre = w * .5;
+        const innerRoom = Math.max(1, centre - shellEdge - 18);
+        const desiredRun = Math.min(targetRun, outerRoom, innerRoom);
+        const riseStart = shellEdge - desiredRun;
+        const riseEnd = shellEdge;
+        const fallEnd = centre;
+        const fallStart = fallEnd - desiredRun;
+
+        // Centre the support label inside the actual visible bump, including
+        // its eased rise and fall. The right-hand version uses the same values
+        // and is mirrored by CSS, so both sides stay optically identical.
+        cut.style.setProperty('--chapter-label-start', `${riseStart.toFixed(2)}px`);
+        cut.style.setProperty('--chapter-label-width', `${(fallEnd - riseStart).toFixed(2)}px`);
+
+        desktopSvg.setAttribute('viewBox', `0 0 ${w.toFixed(2)} ${h.toFixed(2)}`);
+        desktopPath.setAttribute('d',
+          `M0 ${h.toFixed(2)} H${riseStart.toFixed(2)} ` +
+          chapterRampUp(riseStart, riseEnd, h) + ' ' +
+          `L${fallStart.toFixed(2)} 0 ` +
+          chapterRampDown(fallStart, fallEnd, h) + ' ' +
+          `H${w.toFixed(2)} V${h.toFixed(2)} H0 Z`
+        );
+      }
+
+      if (mobileSvg && mobilePath) {
+        const inset = w * .04;
+        // Same continuous profile on mobile, with a longer lead-in/out so the
+        // flat separator visibly eases into the rise instead of turning up.
+        const run = Math.min(92, Math.max(64, w * .20));
+        const riseStart = inset;
+        const riseEnd = inset + run;
+        const fallEnd = w - inset;
+        const fallStart = fallEnd - run;
+
+        mobileSvg.setAttribute('viewBox', `0 0 ${w.toFixed(2)} ${h.toFixed(2)}`);
+        mobilePath.setAttribute('d',
+          `M0 ${h.toFixed(2)} H${riseStart.toFixed(2)} ` +
+          chapterRampUp(riseStart, riseEnd, h) + ' ' +
+          `L${fallStart.toFixed(2)} 0 ` +
+          chapterRampDown(fallStart, fallEnd, h) + ' ' +
+          `H${w.toFixed(2)} V${h.toFixed(2)} H0 Z`
+        );
+      }
+    });
+  }
+
+  updateChapterCuts();
+  addEventListener('load', updateChapterCuts, { once: true });
+  addEventListener('resize', updateChapterCuts, { passive: true });
+  if ('ResizeObserver' in window) {
+    const chapterResizeObserver = new ResizeObserver(updateChapterCuts);
+    chapterCuts.forEach(cut => chapterResizeObserver.observe(cut));
+    if (chapterShell) chapterResizeObserver.observe(chapterShell);
+  }
+
   // Keep prepared line wrapping accurate after a font/layout change.
   // We intentionally do not rebuild lines during normal resize because that
   // would interrupt finished animations; mobile wrapping remains native.
