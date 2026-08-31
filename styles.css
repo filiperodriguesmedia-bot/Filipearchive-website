@@ -842,6 +842,29 @@ figure, p, h1, h2, h3 { margin: 0; }
   height: 100%;
   object-fit: cover;
   z-index: -4;
+  pointer-events: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-appearance: none;
+}
+
+/* Ambient loops are decorative backgrounds, never media players.
+   In particular, suppress Safari/iOS native playback chrome when autoplay is
+   deferred by power/data policy. The poster remains as the clean fallback. */
+.hero__video::-webkit-media-controls,
+.music__video::-webkit-media-controls,
+.hero__video::-webkit-media-controls-enclosure,
+.music__video::-webkit-media-controls-enclosure,
+.hero__video::-webkit-media-controls-panel,
+.music__video::-webkit-media-controls-panel,
+.hero__video::-webkit-media-controls-start-playback-button,
+.music__video::-webkit-media-controls-start-playback-button,
+.hero__video::-webkit-media-controls-overlay-play-button,
+.music__video::-webkit-media-controls-overlay-play-button {
+  display: none !important;
+  -webkit-appearance: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
 .hero__brown-veil,
 .music__veil {

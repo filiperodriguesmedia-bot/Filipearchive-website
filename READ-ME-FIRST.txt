@@ -32,3 +32,6 @@ v79 loader refinement: the wordmark and progress now remain in their exit state 
 
 
 v80 — Loader background changed from brown to the site's warm cream (#fff8ed), with brown typography/progress. All other site behaviour remains unchanged.
+
+
+v81 — iOS ambient-video chrome fix: decorative water videos explicitly have no controls, ignore direct pointer input, suppress WebKit native play overlays, and retain the poster as a clean fallback if iOS Low Power/Data policy delays autoplay. First genuine page gesture still retries playback. Cache version bumped to 81.

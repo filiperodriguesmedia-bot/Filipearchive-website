@@ -613,12 +613,17 @@
       video.autoplay = true;
       video.loop = true;
       video.playsInline = true;
+      video.controls = false;
+      video.removeAttribute('controls');
       video.setAttribute('muted', '');
       video.setAttribute('autoplay', '');
       video.setAttribute('loop', '');
       video.setAttribute('playsinline', '');
       video.setAttribute('webkit-playsinline', '');
       video.setAttribute('preload', 'auto');
+      video.setAttribute('x-webkit-airplay', 'deny');
+      video.setAttribute('tabindex', '-1');
+      if ('disablePictureInPicture' in video) video.disablePictureInPicture = true;
     };
 
     const clearRetry = (video) => {
